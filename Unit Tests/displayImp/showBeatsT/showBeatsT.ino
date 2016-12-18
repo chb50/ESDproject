@@ -1,9 +1,15 @@
 //audio visualizer display using 16x16 led matrix of WS2812 leds
+//this script implements protothreads
 #include <Adafruit_NeoPixel.h>
 #include "WS2812_Definitions.h"
 #include <avr/pgmspace.h>
 #include <ffft.h>
 #include <math.h>
+#include <pt.h>
+
+//threading structs
+static struct pt pt0, pt1, pt2, pt3, pt4, pt5, pt6, pt7;
+struct pt* ptArray[8] = {pt0, pt1, pt2, pt3, pt4, pt5, pt6, pt7};
 
 //FFT stuff -- for now we will get an 8x8 display running
 //when all goes well (hopefully), then we will upgrade to a 16x16
@@ -92,6 +98,11 @@ Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_MATRIX_PIN, NEO_GRB + 
 
 void setup() {
 
+  //thread stuff
+  for(i = 0; i < LED_COUNT; ++i) {
+    PT_INIT(&(ptArray[i]);
+  }
+
   //FFT stuff provided by Piccolo.pde
   uint8_t i, j, nBins, binNum, *data;
 
@@ -150,53 +161,56 @@ void loop() {
       (((spectrum[x] - L) * (256L - pgm_read_byte(&eq[x]))) >> 8);
   }
 
+
+}
+
+void downsampleT(uint8_t threadId) {
   //for threading: each thread requires ~36 bytes. 288 bytes taken from ram
   // Downsample spectrum output to 8 columns:
-  for(x=0; x<8; x++) {
-    data   = (uint8_t *)pgm_read_word(&colData[x]);
-    nBins  = pgm_read_byte(&data[0]) + 2;
-    binNum = pgm_read_byte(&data[1]);
-    for(sum=0, i=2; i<nBins; i++)
-      sum += spectrum[binNum++] * pgm_read_byte(&data[i]); // Weighted
-    col[x][colCount] = sum / colDiv[x];                    // Average
-    minLvl = maxLvl = col[x][0];
-    for(i=1; i<10; i++) { // Get range of prior 10 frames
-      if(col[x][i] < minLvl)      minLvl = col[x][i];
-      else if(col[x][i] > maxLvl) maxLvl = col[x][i];
-    }
-    // minLvl and maxLvl indicate the extents of the FFT output, used
-    // for vertically scaling the output graph (so it looks interesting
-    // regardless of volume level).  If they're too close together though
-    // (e.g. at very low volume levels) the graph becomes super coarse
-    // and 'jumpy'...so keep some minimum distance between them (this
-    // also lets the graph go to zero when no sound is playing):
-    if((maxLvl - minLvl) < 8) maxLvl = minLvl + 8;
-    minLvlAvg[x] = (minLvlAvg[x] * 7 + minLvl) >> 3; // Dampen min/max levels
-    maxLvlAvg[x] = (maxLvlAvg[x] * 7 + maxLvl) >> 3; // (fake rolling average)
 
-    // Second fixed-point scale based on dynamic min/max levels:
-    level = 10L * (col[x][colCount] - minLvlAvg[x]) /
-      (long)(maxLvlAvg[x] - minLvlAvg[x]);
-
-    // Clip output and convert to byte:
-    if(level < 0L)      c = 0;
-    else if(level > 10) c = 10; // Allow dot to go a couple pixels off top
-    else                c = (uint8_t)level;
-
-    if(c > peak[x]) peak[x] = c; // Keep dot on top
-
-    // The 'peak' dot color varies, but doesn't necessarily match
-    // the three screen regions...yellow has a little extra influence.
-    y = 8 - peak[x]; //this is the amplitude for the column at a particlar time
-
-    //LED stuff
-    //x = column
-    //y = row (amp)
-    lightCol8(x, y, 0);
-    
+  //TODO: figure out how to incorperate this into protothreads
+  
+  data   = (uint8_t *)pgm_read_word(&colData[x]);
+  nBins  = pgm_read_byte(&data[0]) + 2;
+  binNum = pgm_read_byte(&data[1]);
+  for(sum=0, i=2; i<nBins; i++)
+    sum += spectrum[binNum++] * pgm_read_byte(&data[i]); // Weighted
+  col[x][colCount] = sum / colDiv[x];                    // Average
+  minLvl = maxLvl = col[x][0];
+  for(i=1; i<10; i++) { // Get range of prior 10 frames
+    if(col[x][i] < minLvl)      minLvl = col[x][i];
+    else if(col[x][i] > maxLvl) maxLvl = col[x][i];
   }
+  // minLvl and maxLvl indicate the extents of the FFT output, used
+  // for vertically scaling the output graph (so it looks interesting
+  // regardless of volume level).  If they're too close together though
+  // (e.g. at very low volume levels) the graph becomes super coarse
+  // and 'jumpy'...so keep some minimum distance between them (this
+  // also lets the graph go to zero when no sound is playing):
+  if((maxLvl - minLvl) < 8) maxLvl = minLvl + 8;
+  minLvlAvg[x] = (minLvlAvg[x] * 7 + minLvl) >> 3; // Dampen min/max levels
+  maxLvlAvg[x] = (maxLvlAvg[x] * 7 + maxLvl) >> 3; // (fake rolling average)
 
+  // Second fixed-point scale based on dynamic min/max levels:
+  level = 10L * (col[x][colCount] - minLvlAvg[x]) /
+    (long)(maxLvlAvg[x] - minLvlAvg[x]);
 
+  // Clip output and convert to byte:
+  if(level < 0L)      c = 0;
+  else if(level > 10) c = 10; // Allow dot to go a couple pixels off top
+  else                c = (uint8_t)level;
+
+  if(c > peak[x]) peak[x] = c; // Keep dot on top
+
+  // The 'peak' dot color varies, but doesn't necessarily match
+  // the three screen regions...yellow has a little extra influence.
+  y = 8 - peak[x]; //this is the amplitude for the column at a particlar time
+
+  //LED stuff
+  //x = column
+  //y = row (amp)
+  lightCol8(x, y, 0);
+  
 }
 
 
@@ -297,5 +311,4 @@ void clearLEDs()
     leds.setPixelColor(i, 0);
   }
 }
-
 
