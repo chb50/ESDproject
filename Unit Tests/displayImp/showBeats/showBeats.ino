@@ -11,11 +11,7 @@
 // Microphone connects to Analog Pin 0.  Corresponding ADC channel number
 // varies among boards...it's ADC0 on Uno and Mega, ADC7 on Leonardo.
 // Other boards may require different settings; refer to datasheet.
-#ifdef __AVR_ATmega32U4__
- #define ADC_CHANNEL 7
-#else
- #define ADC_CHANNEL 0 //will be connecting to ADC channel 0 for this project
-#endif
+#define ADC_CHANNEL 0 //will be connecting to ADC channel 0 for this project
 
 int16_t       capture[FFT_N];    // Audio capture buffer
 complex_t     bfly_buff[FFT_N];  // FFT "butterfly" buffer
@@ -90,6 +86,10 @@ static const uint8_t PROGMEM
 
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
+
+int val = 0;
+
+
 void setup() {
 
   //FFT stuff provided by Piccolo.pde
@@ -126,10 +126,15 @@ void setup() {
   clearLEDs();
   leds.show(); //no led change happens until this function is called, this includes clearing the leds
 
+  Serial.begin(9600);
+
 }
 
 void loop() {
 
+//   clearLEDs();
+//   leds.show();
+  
   //FFT stuff provided by Piccolo.pde
   uint8_t  i, x, L, *data, nBins, binNum, weighting, c;
   uint16_t minLvl, maxLvl;
@@ -142,7 +147,7 @@ void loop() {
   ADCSRA |= _BV(ADIE);             // Resume sampling interrupt
   fft_execute(bfly_buff);          // Process complex data
   fft_output(bfly_buff, spectrum); // Complex -> spectrum
-
+  
   // Remove noise and apply EQ levels
   for(x=0; x<FFT_N/2; x++) {
     L = pgm_read_byte(&noise[x]);
@@ -192,10 +197,16 @@ void loop() {
     //LED stuff
     //x = column
     //y = row (amp)
-    lightCol8(x, y, 0);
-    
+    uint8_t pallet = 0;
+    lightCol8(x, peak[x], pallet);
+    Serial.print(peak[x]); //TODO: peak[x] may be amplitude, idk yet
   }
 
+  leds.show(); //display led
+  
+  //val = ADC;
+  Serial.println();
+  delay(10000);
 
 }
 
@@ -216,34 +227,120 @@ ISR(ADC_vect) { // Audio-sampling interrupt
 //this function controls the color of each column of the display
 //run this function for each column to get entire spectrum
 
+
+//TODO: addressing the matrix is actually the worst thing in the world
+//gunna need to fix the inexing to acount for its snake-like pattern
 //columnId designates the column that we want to turn on
 //amp is how high the column should produce a color
-void lightCol8(uint8_t columnId, uint8_t amp, uint8_t palletType) {
-   
-   clearLEDs();
-   //NOTE: i think matrix is hooked up in snake pattern
-   //so will need to address every other led column in reverse order
-   
-   if (amp >= LED_COUNT) { //failsafe
-      return;
-   }
-    //columnId*LED_COUNT is the column offset
-   int columnOffset = columnId*LED_COUNT;
+void lightCol8(int columnId, int amp, uint8_t palletType) {
    unsigned long int* colorBuff = columnColorPallet8(palletType);
-   
-   if (columnId % 2 == 0) { //then assign as normal
-     for (int i = 0; i < amp; ++i) {
-        leds.setPixelColor(columnOffset + i, colorBuff[i]);
-     }
-   } else { //then assign backwards
-      for (int i = 0; i < amp; ++i) {
-        leds.setPixelColor(columnOffset + (LED_COUNT - 1 - i), colorBuff[i]);
-     }
-   }
+   uint8_t* columnRange = matrixAddr(columnId);
 
-   leds.show(); //display led
+   if(columnId % 2 == 0) {
+      int i = columnRange[0];
+      int colorIter = 0;
+      for (; i < columnRange[0] + amp; ++i) {
+        leds.setPixelColor(columnRange[0] + i, colorBuff[colorIter]);
+        colorIter++;
+      }
+      //at this point, i should be equal to amp, which is the first index that needs to be blacked out
+      //blackout up to the end of the column
+      blackOut(amp, columnRange[1] + 1); //blackout for loop is exclusive, so we add 1
+     
+   } else {
+      //the blackout should happen first
+      blackOut(columnRange[1], columnRange[1] + (16 - (amp-1))); //amp-1 due to exclusive for loop
+
+      int colorIter = amp;
+      for(int i = columnRange[1] + (16 - (amp-1)); i < columnRange[0]; ++i) {
+        leds.setPixelColor(columnRange[0] - i, colorBuff[colorIter]);
+        colorIter--;
+      }
+   }
    
    delete colorBuff;
+}
+
+uint8_t* matrixAddr(int columnId) {
+  //so the addressing on this matrix sucks cause ins really an led strip that was arranged into an array
+  //so addressing is backwards for every other column if you want to use it on a column by column basis
+
+  static uint8_t rangeBuff[2]; //declared static to return pointer from func
+  //NOTE: inclusive range (includes end value)
+  //first value specifies columnId parity
+  //if columnId is even, then we address as normal
+  //if columnId is odd, then we address in reverse order (begin value is higher than end value)
+  
+  switch(columnId) {
+     case 0:
+      rangeBuff[0] = 0;
+      rangeBuff[1] = 15;
+      break;
+     case 1:
+      rangeBuff[0] = 31;
+      rangeBuff[1] = 16;
+      break;
+     case 2:
+      rangeBuff[0] = 32;
+      rangeBuff[1] = 47;
+      break;
+     case 3:
+      rangeBuff[0] = 63;
+      rangeBuff[1] = 48;
+      break;
+     case 4:
+      //Serial.print("test\n");
+      rangeBuff[0] = 64;
+      rangeBuff[1] = 79;
+      break;
+     case 5:
+      rangeBuff[0] = 95;
+      rangeBuff[1] = 80;
+      break;
+     case 6:
+      rangeBuff[0] = 96;
+      rangeBuff[1] = 111;
+      break;
+     case 7:
+      rangeBuff[0] = 127;
+      rangeBuff[1] = 112;
+      break;
+     case 8:
+      rangeBuff[0] = 128;
+      rangeBuff[1] = 143;
+      break;
+     case 9:
+      rangeBuff[0] = 159;
+      rangeBuff[1] = 144;
+      break;
+     case 10:
+      rangeBuff[0] = 160;
+      rangeBuff[1] = 175;
+      break;
+     case 11:
+      rangeBuff[0] = 191;
+      rangeBuff[1] = 176;
+      break;
+     case 12:
+      rangeBuff[0] = 192;
+      rangeBuff[1] = 207;
+      break;
+     case 13:
+      rangeBuff[0] = 223;
+      rangeBuff[1] = 208;
+      break;
+     case 14:
+      rangeBuff[0] = 224;
+      rangeBuff[1] = 239;
+      break;
+     case 15:
+      rangeBuff[0] = 255;
+      rangeBuff[1] = 240;
+      break;
+  }
+
+  return rangeBuff;
+      
 }
 
 //long int compensates for the hex values given by WS2812_Definitions.h
@@ -256,20 +353,22 @@ unsigned long int* columnColorPallet16(int palletType){
       colorBuff[4] = YELLOW; colorBuff[5] = YELLOW; colorBuff[6] = YELLOW; colorBuff[7] = YELLOW; 
       colorBuff[8] = ORANGE; colorBuff[9] = ORANGE; colorBuff[10] = ORANGE; colorBuff[11] = ORANGE; 
       colorBuff[12] = RED; colorBuff[13] = RED; colorBuff[14] = RED; colorBuff[15] = RED;
+      break;
     case 1:
       //cool colors: Indigo-purple-blue-skyblue
       colorBuff[0] = INDIGO; colorBuff[1] = INDIGO; colorBuff[2] = INDIGO; colorBuff[3] = INDIGO; 
       colorBuff[4] = PURPLE; colorBuff[5] = PURPLE; colorBuff[6] = PURPLE; colorBuff[7] = PURPLE; 
       colorBuff[8] = BLUE; colorBuff[9] = BLUE; colorBuff[10] = BLUE; colorBuff[11] = BLUE; 
       colorBuff[12] = TURQUOISE; colorBuff[13] = TURQUOISE; colorBuff[14] = TURQUOISE; colorBuff[15] = TURQUOISE;
+      break;
   }
   return colorBuff;
 
 }
 
 //for 8x8 led display
-unsigned long int* columnColorPallet8(int palletType){
-  unsigned long int* colorBuff = new unsigned long int[LED_COUNT];
+unsigned long int* columnColorPallet8(uint8_t palletType){
+  static unsigned long int* colorBuff = new unsigned long int[LED_COUNT];
   switch(palletType) {
     case 0:
       //green-yello-red color scheme
@@ -277,15 +376,31 @@ unsigned long int* columnColorPallet8(int palletType){
       colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
       colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
       colorBuff[6] = RED; colorBuff[7] = RED;
+      break;
     case 1:
       //cool colors: Indigo-purple-blue-skyblue
       colorBuff[0] = INDIGO; colorBuff[1] = INDIGO;
       colorBuff[2] = PURPLE; colorBuff[3] = PURPLE;
       colorBuff[4] = BLUE; colorBuff[5] = BLUE;
       colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
+      break;
+    default:
+      //green-yello-red color scheme
+      colorBuff[0] = GREEN; colorBuff[1] = GREEN;
+      colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
+      colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
+      colorBuff[6] = RED; colorBuff[7] = RED;
+      break;
   }
   return colorBuff;
 
+}
+
+//have to assign every led, even if they should be off
+void blackOut(uint8_t from, uint8_t to) {
+  for(int i = from; i < to; ++i) {
+    leds.setPixelColor(i, BLACK);
+  }
 }
 
 // Sets all LEDs to off, but DOES NOT update the display;
