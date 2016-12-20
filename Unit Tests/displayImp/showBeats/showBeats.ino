@@ -198,8 +198,14 @@ void loop() {
     //x = column
     //y = row (amp)
     uint8_t pallet = 0;
-    lightCol8(x, peak[x], pallet);
-    Serial.print(peak[x]); //TODO: peak[x] may be amplitude, idk yet
+    lightCol8(x, c, pallet);
+//    Serial.print(peak[x]); //TODO: peak[x] may be amplitude, idk yet
+//    Serial.print(" ");
+    Serial.print(x);
+    Serial.print(" ");
+    Serial.print(c);
+    Serial.print("     ");
+    
   }
 
   leds.show(); //display led
@@ -245,7 +251,7 @@ void lightCol8(int columnId, int amp, uint8_t palletType) {
       }
       //at this point, i should be equal to amp, which is the first index that needs to be blacked out
       //blackout up to the end of the column
-      blackOut(amp, columnRange[1] + 1); //blackout for loop is exclusive, so we add 1
+      blackOut(columnRange[0] + amp, columnRange[1] + 1); //blackout for loop is exclusive, so we add 1
      
    } else {
       //the blackout should happen first
