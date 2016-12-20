@@ -48,29 +48,26 @@ txConnect: tx port map (clk => CLOCK_50, startBit => txStart, data => txData, bu
 rxConnect: rx port map (clk => CLOCK_50, rxLine => UART_RXD, data => rxData, busyFlag => rxBusy);
 
 --Added by Akshaya 
-sendData: process (SW,CLOCK_50) is 
+sendData: process (CLOCK_50) is 
 begin
-	if (busyFlag = '0') then	--check to see if txConnect is sending data
+	if (txBusy = '0') then	--check to see if txConnect is sending data
 		txStart = '1';			--indicate that you are sending bits
 		txData <= sw(7 downto 0);
 	
 	else
-		txStart = '0'; 			--indicate no bits are transmitted
+		txStart = '0'; 			--indicate no bits are transmitted *CHECK THIS! DO WE REALLY NEED IT?
 								--wait for the busyFlag to not be busy
 	end if;
 end process;
 
 recvAck: process (CLOCK_50) is 
 begin 
-	if (UART_TXD = '1') then 
-		txData <= sw(7 downto 0);
+	if (falling_edge(rxBusy)) then 
+		LEDG <= rxData;
 	end if;
 end process;
 
-LEDG <= sw(7 downto 0);	
-
-
-
+LEDR <= sw(7 downto 0);	
 
 ----this process will be used to read information from the switches
 ----and pass the info to tx using the intermediate declared "tx" signals
