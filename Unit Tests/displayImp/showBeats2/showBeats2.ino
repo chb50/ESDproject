@@ -86,7 +86,7 @@ static const uint8_t PROGMEM
 
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
-
+byte pallet;
 
 
 int val = 0;
@@ -132,8 +132,10 @@ void setup() {
 
 }
 
+//make sure uart is disconnected before uploading to board
 void loop() {
-  uint8_t pallet = 1;
+  pallet = Serial.read();
+  Serial.println(pallet);
 //   clearLEDs();
 //   leds.show();
 
@@ -202,10 +204,6 @@ void loop() {
 //    lightCol8(x, c, pallet);
 //    Serial.print(peak[x]); //TODO: peak[x] may be amplitude, idk yet
 //    Serial.print(" ");
-    Serial.print(x);
-    Serial.print(" ");
-    Serial.print(c);
-    Serial.print("     ");
 
     setLEDSon(x, c, pallet);
 
@@ -215,7 +213,6 @@ void loop() {
 //  leds.show(); //display led
 
   //val = ADC;
-  Serial.println();
 //  delay(500);
 
 }
@@ -322,31 +319,8 @@ uint8_t* matrixAddr(int columnId) {
 
 }
 
-//long int compensates for the hex values given by WS2812_Definitions.h
-unsigned long int* columnColorPallet16(int palletType){
-  unsigned long int* colorBuff = new unsigned long int[LED_COUNT];
-  switch(palletType) {
-    case 0:
-      //green-yello-red color scheme
-      colorBuff[0] = GREEN; colorBuff[1] = GREEN; colorBuff[2] = GREEN; colorBuff[3] = GREEN;
-      colorBuff[4] = YELLOW; colorBuff[5] = YELLOW; colorBuff[6] = YELLOW; colorBuff[7] = YELLOW;
-      colorBuff[8] = ORANGE; colorBuff[9] = ORANGE; colorBuff[10] = ORANGE; colorBuff[11] = ORANGE;
-      colorBuff[12] = RED; colorBuff[13] = RED; colorBuff[14] = RED; colorBuff[15] = RED;
-      break;
-    case 1:
-      //cool colors: Indigo-purple-blue-skyblue
-      colorBuff[0] = INDIGO; colorBuff[1] = INDIGO; colorBuff[2] = INDIGO; colorBuff[3] = INDIGO;
-      colorBuff[4] = PURPLE; colorBuff[5] = PURPLE; colorBuff[6] = PURPLE; colorBuff[7] = PURPLE;
-      colorBuff[8] = BLUE; colorBuff[9] = BLUE; colorBuff[10] = BLUE; colorBuff[11] = BLUE;
-      colorBuff[12] = TURQUOISE; colorBuff[13] = TURQUOISE; colorBuff[14] = TURQUOISE; colorBuff[15] = TURQUOISE;
-      break;
-  }
-  return colorBuff;
-
-}
-
 //for 8x8 led display
-unsigned long int* columnColorPallet8(uint8_t palletType){
+unsigned long int* columnColorPallet8(byte palletType){
   static unsigned long int* colorBuff = new unsigned long int[LED_COUNT];
   switch(palletType) {
     case 0:
@@ -363,6 +337,20 @@ unsigned long int* columnColorPallet8(uint8_t palletType){
       colorBuff[4] = BLUE; colorBuff[5] = BLUE;
       colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
       break;
+
+     case 253:
+      //green-yello-red color scheme
+      colorBuff[0] = GREEN; colorBuff[1] = GREEN;
+      colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
+      colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
+      colorBuff[6] = RED; colorBuff[7] = RED;
+     case 251:
+      //cool colors: Indigo-purple-blue-skyblue
+      colorBuff[0] = INDIGO; colorBuff[1] = INDIGO;
+      colorBuff[2] = PURPLE; colorBuff[3] = PURPLE;
+      colorBuff[4] = BLUE; colorBuff[5] = BLUE;
+      colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
+      break;
     default:
       //green-yello-red color scheme
       colorBuff[0] = GREEN; colorBuff[1] = GREEN;
@@ -372,7 +360,6 @@ unsigned long int* columnColorPallet8(uint8_t palletType){
       break;
   }
   return colorBuff;
-
 }
 
 //have to assign every led, even if they should be off
@@ -393,7 +380,7 @@ void clearLEDs()
 }
 
 
-void setLEDSon(int row, int num, uint8_t palletType) {
+void setLEDSon(int row, int num, byte palletType) {
 
   unsigned long int* colorBuff = columnColorPallet8(palletType);
   
