@@ -82,7 +82,7 @@ static const uint8_t PROGMEM
 
 //LED stuff
 #define LED_MATRIX_PIN 4 //this is the port that the led matrix will be connected to
-#define LED_COUNT 256 //note this is for a single row. change to 16 later
+#define LED_COUNT 256
 
 Adafruit_NeoPixel leds = Adafruit_NeoPixel(LED_COUNT, LED_MATRIX_PIN, NEO_GRB + NEO_KHZ800);
 
@@ -321,29 +321,32 @@ uint8_t* matrixAddr(int columnId) {
 
 //for 8x8 led display
 unsigned long int* columnColorPallet8(byte palletType){
-  static unsigned long int* colorBuff = new unsigned long int[LED_COUNT];
+  static unsigned long int* colorBuff = new unsigned long int[10];
   switch(palletType) {
-    case 0:
-      //green-yello-red color scheme
-      colorBuff[0] = GREEN; colorBuff[1] = GREEN;
-      colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
-      colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
-      colorBuff[6] = RED; colorBuff[7] = RED;
-      break;
-    case 1:
-      //cool colors: Indigo-purple-blue-skyblue
-      colorBuff[0] = INDIGO; colorBuff[1] = INDIGO;
-      colorBuff[2] = PURPLE; colorBuff[3] = PURPLE;
-      colorBuff[4] = BLUE; colorBuff[5] = BLUE;
-      colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
-      break;
+//    case 0: // test Case
+//      //green-yello-red color scheme
+//      colorBuff[0] = GREEN; colorBuff[1] = GREEN;
+//      colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
+//      colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
+//      colorBuff[6] = RED; colorBuff[7] = RED;
+//      colorBuff[8] = NAVY; colorBuff[9] = NAVY;
+//      break;
+//    case 1: //test case
+//      //cool colors: Indigo-purple-blue-skyblue
+//      colorBuff[0] = INDIGO; colorBuff[1] = INDIGO;
+//      colorBuff[2] = PURPLE; colorBuff[3] = PURPLE;
+//      colorBuff[4] = BLUE; colorBuff[5] = BLUE;
+//      colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
+//      break;
 
      case 253:
       //green-yello-red color scheme
       colorBuff[0] = GREEN; colorBuff[1] = GREEN;
       colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
       colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
-      colorBuff[6] = RED; colorBuff[7] = RED;
+      colorBuff[6] = ORANGE; colorBuff[7] = ORANGE;
+      colorBuff[8] = RED; colorBuff[9] = RED;
+      break;
      case 251:
       //cool colors: Indigo-purple-blue-skyblue
       colorBuff[0] = INDIGO; colorBuff[1] = INDIGO;
@@ -351,12 +354,11 @@ unsigned long int* columnColorPallet8(byte palletType){
       colorBuff[4] = BLUE; colorBuff[5] = BLUE;
       colorBuff[6] = TURQUOISE; colorBuff[7] = TURQUOISE;
       break;
-    default:
-      //green-yello-red color scheme
-      colorBuff[0] = GREEN; colorBuff[1] = GREEN;
-      colorBuff[2] = YELLOW; colorBuff[3] = YELLOW;
-      colorBuff[4] = ORANGE; colorBuff[5] = ORANGE;
-      colorBuff[6] = RED; colorBuff[7] = RED;
+     case 247: //white - pink - red
+      colorBuff[0] = WHITE; colorBuff[1] = WHITE;
+      colorBuff[2] = DEEPPINK; colorBuff[3] = DEEPPINK;
+      colorBuff[4] = RED; colorBuff[5] = RED;
+      colorBuff[6] = DARKRED; colorBuff[7] = DARKRED;
       break;
   }
   return colorBuff;
@@ -380,21 +382,56 @@ void clearLEDs()
 }
 
 
-void setLEDSon(int row, int num, byte palletType) {
+void setLEDSon(int col, int amp, byte palletType) {
 
   unsigned long int* colorBuff = columnColorPallet8(palletType);
   
   int count = 0;
-  for (int i=row*32-16; i<row*32+32; i++){
-    count++;
+  for (int i=col*32-16; i<col*32+32; i++){
 //    Serial.print("i: ");
 //    Serial.print(i);
 //    Serial.print("num: ");
 //    Serial.println(num);
-    if (num > count)
-      leds.setPixelColor(i, colorBuff[count]);
-    else
+    if (amp > count) {
+      if (palletType == 255) {
+        switch(col) {
+          case 1:
+            leds.setPixelColor(i, RED);
+            break;
+          case 2:
+            leds.setPixelColor(i, ORANGE);
+            break;
+          case 3:
+            leds.setPixelColor(i, YELLOW);
+            break;
+          case 4:
+            leds.setPixelColor(i, GREEN);
+            break;
+          case 5:
+            leds.setPixelColor(i, BLUE);
+            break;
+          case 6:
+            leds.setPixelColor(i, INDIGO);
+            break;
+          case 7:
+            leds.setPixelColor(i, VIOLET);
+            break;
+          case 8:
+            leds.setPixelColor(i, WHITE);
+            break;
+          default:
+            leds.setPixelColor(i, WHITE);
+            break;
+        }
+      }
+      else {
+        leds.setPixelColor(i, colorBuff[count]);
+      }
+    }
+    else {
       leds.setPixelColor(i, 0);
+    }
+    count++;
 //    Serial.println("test\n");
   }
 //  Serial.println("set color");
